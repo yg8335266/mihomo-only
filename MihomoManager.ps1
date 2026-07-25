@@ -72,14 +72,8 @@ $StartupDir   = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\St
 $StartupLnk   = Join-Path $StartupDir 'Mihomo.lnk'
 $ProxyRegPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
 
-# 配置在线更新地址（可选；没有可先留空，按钮会提示）
+# 配置在线更新地址；以后要改更新源，只改这里
 $GistUrl = 'https://gist.githubusercontent.com/yg8335266/847e4a81338c85bac1a6783666d3249e/raw/myrule.yaml'
-
-# 内核上游（MetaCubeX/mihomo 官方 Release）
-$MihomoRepo = 'MetaCubeX/mihomo'
-# 你当前使用的变体：mihomo-windows-amd64-v3-*.zip
-# 其他可选：windows-amd64 / windows-amd64-go120 / windows-arm64 等
-$MihomoAssetPattern = 'windows-amd64-v3'
 
 # -------------------- 工具函数 --------------------
 function Write-UiLog {
@@ -721,133 +715,6 @@ function Open-Dashboard {
     Start-Process $info.UiUrl
 }
 
-function Get-LocalMihomoVersion {
-    if (-not (Test-Path -LiteralPath $ExePath)) { return $null }
-    try {
-        $psi = New-Object System.Diagnostics.ProcessStartInfo
-        $psi.FileName = $ExePath
-        $psi.Arguments = '-v'
-        $psi.UseShellExecute = $false
-        $psi.RedirectStandardOutput = $true
-        $psi.RedirectStandardError = $true
-        $psi.CreateNoWindow = $true
-        $p = New-Object System.Diagnostics.Process
-        $p.StartInfo = $psi
-        [void]$p.Start()
-        $out = $p.StandardOutput.ReadToEnd()
-        $err = $p.StandardError.ReadToEnd()
-        [void]$p.WaitForExit(5000)
-        $text = ($out + ' ' + $err).Trim()
-        if ($text) { return ($text -split "`r?`n")[0].Trim() }
-    } catch {}
-    return $null
-}
-
-function Update-MihomoCoreFromUpstream {
-    # 从 GitHub 上游 MetaCubeX/mihomo 的 Release 拉取最新内核
-    # 默认匹配 windows-amd64-v3（与你正在用的包一致）
-    $prevEap = $ErrorActionPreference
-    $ErrorActionPreference = 'Stop'
-    $work = Join-Path $Root ('core-update-' + [guid]::NewGuid().ToString('N'))
-    $zipPath = Join-Path $work 'mihomo.zip'
-    $extractDir = Join-Path $work 'extract'
-
-    try {
-        New-Item -ItemType Directory -Path $work -Force | Out-Null
-        New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
-
-        $localVer = Get-LocalMihomoVersion
-        if ($localVer) {
-            Write-UiLog ('当前内核: {0}' -f $localVer)
-        } else {
-            Write-UiLog '当前目录还没有可用的 mihomo.exe（将全新下载）' 'WARN'
-        }
-
-        $api = 'https://api.github.com/repos/{0}/releases/latest' -f $MihomoRepo
-        Write-UiLog ('查询上游最新版: {0}' -f $api)
-
-        $headers = @{
-            'User-Agent' = 'MihomoManager'
-            'Accept'     = 'application/vnd.github+json'
-        }
-        $release = Invoke-RestMethod -Uri $api -Headers $headers -TimeoutSec 30
-        $tag = [string]$release.tag_name
-        if (-not $tag) { throw '无法解析上游版本号' }
-        Write-UiLog ('上游最新版本: {0}' -f $tag) 'OK'
-        Write-UiLog ('目标资源匹配: {0}' -f $MihomoAssetPattern)
-
-        # 优先精确匹配你指定的变体（默认 windows-amd64-v3）
-        $asset = @($release.assets) | Where-Object {
-            $_.name -match [regex]::Escape($MihomoAssetPattern) -and $_.name -match '\.zip$'
-        } | Select-Object -First 1
-
-        if (-not $asset) {
-            throw ("未在 Release 中找到匹配资源。`n需要文件名包含: {0}`n例如: mihomo-windows-amd64-v3-v1.19.29.zip" -f $MihomoAssetPattern)
-        }
-
-        Write-UiLog ('下载: {0} ({1:N0} 字节)' -f $asset.name, [int64]$asset.size)
-        if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-            $curlOut = & curl.exe -L --fail --silent --show-error -o $zipPath $asset.browser_download_url 2>&1
-            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $zipPath)) {
-                throw ('curl 下载失败: {0}' -f (($curlOut | Out-String).Trim()))
-            }
-        } else {
-            Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zipPath -UseBasicParsing
-        }
-
-        Write-UiLog '正在解压…'
-        Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
-
-        $newExe = Get-ChildItem -LiteralPath $extractDir -Recurse -File -Filter 'mihomo*.exe' |
-            Sort-Object Length -Descending |
-            Select-Object -First 1
-        if (-not $newExe) {
-            throw '压缩包中未找到 mihomo*.exe'
-        }
-        Write-UiLog ('解压得到: {0}' -f $newExe.Name)
-
-        $wasRunning = Test-MihomoRunning
-        if ($wasRunning) {
-            Write-UiLog '更新前先停止当前 Mihomo…'
-            [void](Stop-MihomoCore)
-        }
-
-        # 备份旧内核
-        if (Test-Path -LiteralPath $ExePath) {
-            $bakDir = Join-Path $Root 'meta-backup'
-            New-Item -ItemType Directory -Path $bakDir -Force | Out-Null
-            $bakName = 'mihomo-{0}.exe.bak' -f (Get-Date -Format 'yyyyMMdd-HHmmss')
-            $bakPath = Join-Path $bakDir $bakName
-            Copy-Item -LiteralPath $ExePath -Destination $bakPath -Force
-            Write-UiLog ('旧内核已备份: meta-backup\{0}' -f $bakName) 'OK'
-        }
-
-        Copy-Item -LiteralPath $newExe.FullName -Destination $ExePath -Force
-        $newVer = Get-LocalMihomoVersion
-        if ($newVer) {
-            Write-UiLog ('内核已更新: {0}' -f $newVer) 'OK'
-        } else {
-            Write-UiLog '内核文件已替换（未能读取版本号）' 'OK'
-        }
-
-        if ($wasRunning) {
-            if (Confirm-Action "内核已更新。`n是否立即启动 Mihomo？") {
-                Start-MihomoCore -Silent
-                Show-Info ("内核已更新并已启动。`n版本: {0}" -f $(if ($newVer) { $newVer } else { $tag }))
-            } else {
-                Show-Info ("内核已更新。`n版本: {0}`n当前未启动。" -f $(if ($newVer) { $newVer } else { $tag }))
-            }
-        } else {
-            Show-Info ("内核已更新。`n版本: {0}`n可点击「启动」。" -f $(if ($newVer) { $newVer } else { $tag }))
-        }
-    } finally {
-        $ErrorActionPreference = $prevEap
-        if (Test-Path -LiteralPath $work) {
-            Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
-        }
-    }
-}
-
 function Open-Folder {
     Start-Process explorer.exe $Root
 }
@@ -956,7 +823,7 @@ try {
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = 'Mihomo 管理面板'
-$form.ClientSize = New-Object System.Drawing.Size(720, 890)
+$form.ClientSize = New-Object System.Drawing.Size(720, 820)
 $form.StartPosition = 'CenterScreen'
 $form.FormBorderStyle = 'FixedSingle'
 $form.MaximizeBox = $false
@@ -1034,7 +901,7 @@ $grpStatus.Controls.Add($script:lblPanel)
 $grpActions = New-Object System.Windows.Forms.GroupBox
 $grpActions.Text = '常用操作'
 $grpActions.Location = New-Object System.Drawing.Point(20, 310)
-$grpActions.Size = New-Object System.Drawing.Size(680, 250)
+$grpActions.Size = New-Object System.Drawing.Size(680, 200)
 $form.Controls.Add($grpActions)
 
 function New-ActionButton {
@@ -1056,32 +923,28 @@ function New-ActionButton {
     return $b
 }
 
-$btnStart    = New-ActionButton '启动' 20 30
-$btnStop     = New-ActionButton '停止' 185 30
-$btnRestart  = New-ActionButton '重启' 350 30
-$btnRefresh  = New-ActionButton '刷新状态' 515 30
-$btnProxyOn  = New-ActionButton '开启系统代理' 20 84
-$btnProxyOff = New-ActionButton '关闭系统代理' 185 84
-$btnAutoOn   = New-ActionButton '开启开机自启' 350 84
-$btnAutoOff  = New-ActionButton '关闭开机自启' 515 84
-$btnUpdate   = New-ActionButton '更新配置' 20 138
-$btnCore     = New-ActionButton '更新内核' 185 138
-$btnDash     = New-ActionButton '打开面板' 350 138
-$btnFolder   = New-ActionButton '打开目录' 515 138
-$btnSetup    = New-ActionButton '首次安装' 20 192
-$btnExample  = New-ActionButton '生成示例配置' 185 192
+$btnStart    = New-ActionButton '启动' 20 34
+$btnStop     = New-ActionButton '停止' 185 34
+$btnRestart  = New-ActionButton '重启' 350 34
+$btnRefresh  = New-ActionButton '刷新状态' 515 34
+$btnProxyOn  = New-ActionButton '开启系统代理' 20 90
+$btnProxyOff = New-ActionButton '关闭系统代理' 185 90
+$btnAutoOn   = New-ActionButton '开启开机自启' 350 90
+$btnAutoOff  = New-ActionButton '关闭开机自启' 515 90
+$btnUpdate   = New-ActionButton '更新配置' 20 146
+$btnSetup    = New-ActionButton '首次安装' 185 146
+$btnDash     = New-ActionButton '打开面板' 350 146
+$btnFolder   = New-ActionButton '打开目录' 515 146
 
 $script:actionButtons = @(
     $btnStart, $btnStop, $btnRestart, $btnRefresh,
     $btnProxyOn, $btnProxyOff, $btnAutoOn, $btnAutoOff,
-    $btnUpdate, $btnCore, $btnDash, $btnFolder,
-    $btnSetup, $btnExample
+    $btnUpdate, $btnSetup, $btnDash, $btnFolder
 )
 
-# 日志框
 $grpLog = New-Object System.Windows.Forms.GroupBox
 $grpLog.Text = '运行日志'
-$grpLog.Location = New-Object System.Drawing.Point(20, 574)
+$grpLog.Location = New-Object System.Drawing.Point(20, 520)
 $grpLog.Size = New-Object System.Drawing.Size(680, 200)
 $form.Controls.Add($grpLog)
 
@@ -1096,9 +959,8 @@ $script:txtLog.Font = $uiFontLog
 $script:txtLog.BorderStyle = 'FixedSingle'
 $grpLog.Controls.Add($script:txtLog)
 
-# 底部两行
 $script:lblAdmin = New-Object System.Windows.Forms.Label
-$script:lblAdmin.Location = New-Object System.Drawing.Point(22, 790)
+$script:lblAdmin.Location = New-Object System.Drawing.Point(22, 736)
 $script:lblAdmin.Size = New-Object System.Drawing.Size(680, 26)
 $script:lblAdmin.ForeColor = [System.Drawing.Color]::DimGray
 $script:lblAdmin.AutoEllipsis = $true
@@ -1106,13 +968,12 @@ try { $script:lblAdmin.UseCompatibleTextRendering = $false } catch {}
 $form.Controls.Add($script:lblAdmin)
 
 $script:lblDir = New-Object System.Windows.Forms.Label
-$script:lblDir.Location = New-Object System.Drawing.Point(22, 822)
+$script:lblDir.Location = New-Object System.Drawing.Point(22, 768)
 $script:lblDir.Size = New-Object System.Drawing.Size(680, 26)
 $script:lblDir.ForeColor = [System.Drawing.Color]::DarkGray
 $script:lblDir.AutoEllipsis = $true
 try { $script:lblDir.UseCompatibleTextRendering = $false } catch {}
 $form.Controls.Add($script:lblDir)
-
 # -------------------- 事件绑定 --------------------
 $btnRefresh.Add_Click({
     Update-StatusUi
@@ -1190,40 +1051,11 @@ $btnUpdate.Add_Click({
     }
 })
 
-$btnCore.Add_Click({
-    Invoke-Safe {
-        $msg = "将从 GitHub 上游仓库下载最新 mihomo 内核：`n$MihomoRepo`n`n匹配资源: $MihomoAssetPattern`n会先备份旧 mihomo.exe 到 meta-backup\`n是否继续？"
-        if (-not (Confirm-Action $msg '更新内核')) { return }
-        Update-MihomoCoreFromUpstream
-    }
-})
-
 $btnSetup.Add_Click({
     Invoke-Safe {
         $msg = "将执行「首次安装」流程：`n1. 检查文件`n2. 启动 Mihomo`n3. 开启系统代理`n`n是否继续？"
         if (-not (Confirm-Action $msg)) { return }
         Invoke-FirstSetup
-    }
-})
-
-$btnExample.Add_Click({
-    Invoke-Safe {
-        $example = Join-Path $Root 'config.example.yaml'
-        if (-not (Test-Path -LiteralPath $example)) {
-            throw "未找到 config.example.yaml`n路径: $example"
-        }
-        if (Test-Path -LiteralPath $ConfigPath) {
-            if (-not (Confirm-Action "本地已有 config.yaml。`n是否先备份再从示例覆盖？`n（会备份为 config-时间.yaml.bak）")) {
-                return
-            }
-            $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-            $bak = Join-Path $Root ('config-{0}.yaml.bak' -f $stamp)
-            Copy-Item -LiteralPath $ConfigPath -Destination $bak -Force
-            Write-UiLog ('已备份: {0}' -f (Split-Path $bak -Leaf)) 'OK'
-        }
-        Copy-Item -LiteralPath $example -Destination $ConfigPath -Force
-        Write-UiLog '已从 config.example.yaml 生成 config.yaml' 'OK'
-        Show-Info "已生成 config.yaml。`n请用记事本修改：`n1) secret`n2) 订阅 URL`n3) 端口（如需）`n然后再启动。"
     }
 })
 
