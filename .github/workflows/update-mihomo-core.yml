@@ -1,9 +1,12 @@
 name: Update mihomo core from upstream
 
 # 作用：
-# - 定时 / 手动 从 MetaCubeX/mihomo 官方 Release 拉取最新 windows-amd64
+# - 定时 / 手动 从 MetaCubeX/mihomo 官方 Release 拉取最新 windows-amd64-v3
 # - 上传到「本仓库」的 GitHub Release（tag: core-vX.Y.Z）
 # - 不把 mihomo.exe 直接塞进 Git 历史（体积大、难 diff）
+#
+# 你当前使用的上游包示例：
+# https://github.com/MetaCubeX/mihomo/releases/download/v1.19.29/mihomo-windows-amd64-v3-v1.19.29.zip
 #
 # 说明：
 # - 这跟「管理面板更新内核」是两回事：这里是 GitHub 自动跟官方上游
@@ -18,6 +21,10 @@ on:
 permissions:
   contents: write
 
+env:
+  # 与你正在使用的内核变体保持一致
+  MIHOMO_ASSET_PATTERN: 'windows-amd64-v3'
+
 jobs:
   update-core:
     runs-on: ubuntu-latest
@@ -28,30 +35,36 @@ jobs:
       - name: Get latest MetaCubeX/mihomo release
         id: upstream
         uses: actions/github-script@v7
+        env:
+          MIHOMO_ASSET_PATTERN: ${{ env.MIHOMO_ASSET_PATTERN }}
         with:
           script: |
             const owner = 'MetaCubeX';
             const repo = 'mihomo';
+            const pattern = process.env.MIHOMO_ASSET_PATTERN || 'windows-amd64-v3';
             const release = await github.rest.repos.getLatestRelease({ owner, repo });
             const tag = release.data.tag_name; // e.g. v1.19.x
             const assets = release.data.assets || [];
-            // Prefer normal windows-amd64 zip, skip go120/compatible if possible
+
+            // Exact-ish match for the variant you use, e.g. mihomo-windows-amd64-v3-v1.19.29.zip
             let asset = assets.find(a =>
-              /windows-amd64/i.test(a.name) &&
-              /\.zip$/i.test(a.name) &&
-              !/go120|compatible/i.test(a.name)
+              a.name.toLowerCase().includes(pattern.toLowerCase()) &&
+              /\.zip$/i.test(a.name)
             );
+
             if (!asset) {
-              asset = assets.find(a => /windows-amd64/i.test(a.name) && /\.zip$/i.test(a.name));
-            }
-            if (!asset) {
-              core.setFailed('No windows-amd64 zip found in latest mihomo release');
+              core.setFailed(`No zip found matching pattern: ${pattern}`);
+              core.info('Available assets:');
+              for (const a of assets) core.info(`- ${a.name}`);
               return;
             }
+
             core.setOutput('tag', tag);
             core.setOutput('asset_name', asset.name);
             core.setOutput('asset_url', asset.browser_download_url);
+            core.setOutput('pattern', pattern);
             core.info(`Upstream tag: ${tag}`);
+            core.info(`Matched pattern: ${pattern}`);
             core.info(`Asset: ${asset.name}`);
 
       - name: Check if this repo already has core release
@@ -102,10 +115,10 @@ jobs:
             - 上游仓库：https://github.com/MetaCubeX/mihomo
             - 上游版本：`${{ steps.upstream.outputs.tag }}`
             - 资源文件：`${{ steps.upstream.outputs.asset_name }}`
-            - 本仓库附件：`mihomo.exe`（windows-amd64）
+            - 匹配变体：`${{ steps.upstream.outputs.pattern }}`
+            - 本仓库附件：`mihomo.exe`（来自 windows-amd64-v3 包）
 
-            管理面板「更新内核」也可直接从官方 Release 下载；
-            本 Release 方便你在 GitHub 侧固定/分发同一版本。
+            本 Release 用于在 GitHub 侧自动跟随官方上游内核版本。
           files: |
             dist/mihomo.exe
           fail_on_unmatched_files: true

@@ -77,8 +77,9 @@ $GistUrl = 'https://gist.githubusercontent.com/yg8335266/847e4a81338c85bac1a6783
 
 # 内核上游（MetaCubeX/mihomo 官方 Release）
 $MihomoRepo = 'MetaCubeX/mihomo'
-# windows-amd64 压缩包名匹配（可按需要改 arm64）
-$MihomoAssetPattern = 'windows-amd64'
+# 你当前使用的变体：mihomo-windows-amd64-v3-*.zip
+# 其他可选：windows-amd64 / windows-amd64-go120 / windows-arm64 等
+$MihomoAssetPattern = 'windows-amd64-v3'
 
 # -------------------- 工具函数 --------------------
 function Write-UiLog {
@@ -743,7 +744,8 @@ function Get-LocalMihomoVersion {
 }
 
 function Update-MihomoCoreFromUpstream {
-    # 从 GitHub 上游 MetaCubeX/mihomo 的 Release 拉取最新 windows-amd64 内核
+    # 从 GitHub 上游 MetaCubeX/mihomo 的 Release 拉取最新内核
+    # 默认匹配 windows-amd64-v3（与你正在用的包一致）
     $prevEap = $ErrorActionPreference
     $ErrorActionPreference = 'Stop'
     $work = Join-Path $Root ('core-update-' + [guid]::NewGuid().ToString('N'))
@@ -772,19 +774,15 @@ function Update-MihomoCoreFromUpstream {
         $tag = [string]$release.tag_name
         if (-not $tag) { throw '无法解析上游版本号' }
         Write-UiLog ('上游最新版本: {0}' -f $tag) 'OK'
+        Write-UiLog ('目标资源匹配: {0}' -f $MihomoAssetPattern)
 
+        # 优先精确匹配你指定的变体（默认 windows-amd64-v3）
         $asset = @($release.assets) | Where-Object {
-            $_.name -match [regex]::Escape($MihomoAssetPattern) -and $_.name -match '\.zip$' -and $_.name -notmatch 'go120|compatible'
+            $_.name -match [regex]::Escape($MihomoAssetPattern) -and $_.name -match '\.zip$'
         } | Select-Object -First 1
 
         if (-not $asset) {
-            # 放宽：只要 windows-amd64 zip
-            $asset = @($release.assets) | Where-Object {
-                $_.name -match 'windows-amd64' -and $_.name -match '\.zip$'
-            } | Select-Object -First 1
-        }
-        if (-not $asset) {
-            throw ('未在 Release 中找到匹配资源（需要含 {0} 的 zip）' -f $MihomoAssetPattern)
+            throw ("未在 Release 中找到匹配资源。`n需要文件名包含: {0}`n例如: mihomo-windows-amd64-v3-v1.19.29.zip" -f $MihomoAssetPattern)
         }
 
         Write-UiLog ('下载: {0} ({1:N0} 字节)' -f $asset.name, [int64]$asset.size)
