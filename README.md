@@ -1,9 +1,9 @@
-# mihomo-lazy（优化版）
+# mihomo-only
 
-Windows 便携 Mihomo 懒人包：**示例配置 + 图形管理面板**，内核自行从官方获取。
+Windows 便携 Mihomo 懒人包：示例配置 + 图形管理面板，内核自行从官方获取。
 
-> 本项目由原 [mihomo-lazy](https://github.com/yg8335266/mihomo-lazy) 思路改进而来，并在本地重构了启动/管理方式。  
-> **核心能力来自上游开源项目，详见文末「致谢」。**
+> 本项目参考自 [hubentuan/mihomo-lazy](https://github.com/hubentuan/mihomo-lazy)，并重构了启动与管理方式。
+> 核心能力来自上游开源项目，详见文末「致谢」。
 
 ---
 
@@ -28,12 +28,12 @@ Windows 便携 Mihomo 懒人包：**示例配置 + 图形管理面板**，内核
 ├── MihomoManager.vbs      # 双击打开管理面板
 ├── MihomoManager.ps1      # 管理面板逻辑
 ├── start-mihomo.vbs       # 提权 + 便携目录启动
-├── config.example.yaml    # 示例配置（复制为 config.yaml）
+├── config.example.yaml    # 示例���置（复制为 config.yaml）
 ├── ui/zashboard/          # Web 控制面板
 └── .gitignore
 ```
 
-本地运行后还会生成（已忽略，不要提交）：
+本地运行后还会生成（已忽略，不会上传）：
 
 - `mihomo.exe`
 - `config.yaml`
@@ -54,7 +54,7 @@ Windows 便携 Mihomo 懒人包：**示例配置 + 图形管理面板**，内核
 
 解压后把 `mihomo.exe` 放到本目录（与 `MihomoManager.vbs` 同级）。
 
-> 本仓库**不内置、不分发** mihomo 内核，请从官方 Releases 下载。
+> 本仓库不内置、不分发 mihomo 内核，请从官方 Releases 下载。
 
 ### 2. 准备配置
 
@@ -70,11 +70,7 @@ copy config.example.yaml config.yaml
 
 ### 3. 启动
 
-双击：
-
-```text
-MihomoManager.vbs
-```
+双击 `MihomoManager.vbs`。
 
 建议流程：
 
@@ -100,7 +96,7 @@ MihomoManager.vbs
 
 说明：
 
-- 控制面板地址 **只从 `config.yaml` 读取**，不写死端口
+- 控制面板地址只从 `config.yaml` 读取，不写死端口
 - 面板页面（如 `/ui/zashboard/`）和 API（如 `/configs`）不是同一个地址
 - 若 Mihomo 以管理员运行，停止/重启时可能再弹一次 UAC
 
@@ -124,73 +120,42 @@ $GistUrl = '你的配置 raw 地址'
 
 ---
 
-## 安全提醒
-
-- **不要**把含真实订阅、token、`secret` 的 `config.yaml` 推到公开仓库
-- 仓库只应保留 `config.example.yaml` 这类脱敏示例
-- 建议 `allow-lan: false`，除非你明确需要局域网共享
-- 面板密钥请使用强密码
-
----
-
-## 常见问题
-
-### 1. 双击管理面板没反应 / 杀软拦截
-`MihomoManager.vbs` 会静默启动 PowerShell 显示 GUI。若火绒等拦截“隐藏 PowerShell”，请对本目录放行。
-
-### 2. 停止/重启提示权限不足
-Mihomo 可能以管理员运行。按 UAC 提示允许，或用管理员身份重试。
-
-### 3. 改了端口，旧端口浏览器还能打开
-多半是浏览器缓存。用无痕窗口验证；并确认已重启 Mihomo。
-
-### 4. 用户目录又出现 `.config\mihomo`
-请确认使用新的 `start-mihomo.vbs`（带 `-d` 便携目录参数）启动，并重启一次。
-
-### 5. 只有脚本没有内核/配置
-这是正常的干净仓库状态。按「快速开始」自行放置 `mihomo.exe` 并生成 `config.yaml`。
-
----
-
 ## 致谢（Credits）
 
 本项目站在以下开源工作之上，谨致谢意：
 
 ### 核心与生态
 
-- **[MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo)**  
-  Mihomo（Clash Meta）内核。本项目的代理能力完全依赖该项目。
+- **[MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo)**
+  Mihomo（Clash Meta）内核。本���目的代理能力完全依赖该项目。
 
-- **原 mihomo-lazy 项目思路与作者**  
-  本仓库最初由 [yg8335266/mihomo-lazy](https://github.com/yg8335266/mihomo-lazy) 发展而来；该仓库曾作为上游懒人包的 fork/使用基础。  
-  感谢原作者提供「便携懒人包」这一易用形态与配置组织思路。  
-  > 若你知道更准确的原始上游仓库地址，欢迎补充到此处。
+- **[hubentuan/mihomo-lazy](https://github.com/hubentuan/mihomo-lazy)**
+  本项目参考自该仓库的「便携懒人包」形态与配置组织思路，感谢原作者提供的易用组织方式。
 
 ### 面板与规则
 
-- **[Zashboard](https://github.com/Zephyruso/zashboard)**（及 MetaCubeX 面板生态相关项目）  
-  本目录内置 `ui/zashboard` Web 面板。
+- **[Zephyruso/zashboard](https://github.com/Zephyruso/zashboard)**
+  本目录内置 `ui/zashboard` Web 控制面板。
 
-- **[Loyalsoldier/clash-rules](https://github.com/Loyalsoldier/clash-rules)**  
+- **[Loyalsoldier/clash-rules](https://github.com/Loyalsoldier/clash-rules)**
   示例配置中的规则集来源之一。
 
 ### 说明
 
-- 本优化版主要改动：Windows 图形管理、便携目录启动（`-d`）、配置更新校验与热重载、仓库侧内核同步工作流等。
+- 本项目主要改动：Windows 图形管理、便携目录启动（`-d`）、配置更新校验与热重载等。
 - 内核版权与许可以 [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) 及其依赖为准。
-- 若本 README 致谢有遗漏，请提交 issue/PR，我们会尽快补全。
+- 若致谢有遗漏，欢迎补充。
 
 ---
 
 ## License
 
-- 本仓库新增的管理脚本与工作流：可按你的发布需要自行声明许可（建议与上游兼容，例如 MIT）。
-- **Mihomo 内核、面板、规则集** 请遵守各自上游项目的开源许可证。
-- 使用前请阅读并遵守当地法律法规与服务条款；本项目仅供学习与个人网络调试参考。
+- 本仓库新增的管理脚本：可按你的发布需要自行声明许可（建议与上游兼容，例如 MIT）。
+- Mihomo 内核、面板、规则集请遵守各自上游项目的开源许可证。
 
 ---
 
 ## 免责声明
 
-本项目不提供任何代理服务，不包含商业节点。  
-使用第三方订阅与规则的风险由使用者自行承担。
+本项目不提供任何代理服务，不包含商业节点。
+使用第三方订阅与规则的风险由使用者自行承担，使用前请遵守当地法律法规。
