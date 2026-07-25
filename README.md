@@ -1,6 +1,6 @@
 # mihomo-lazy（优化版）
 
-Windows 便携 Mihomo 懒人包：**内核 + 示例配置 + 图形管理面板 + 可选 GitHub 自动同步内核**。
+Windows 便携 Mihomo 懒人包：**示例配置 + 图形管理面板**，内核自行从官方获取。
 
 > 本项目由原 [mihomo-lazy](https://github.com/yg8335266/mihomo-lazy) 思路改进而来，并在本地重构了启动/管理方式。  
 > **核心能力来自上游开源项目，详见文末「致谢」。**
@@ -18,7 +18,6 @@ Windows 便携 Mihomo 懒人包：**内核 + 示例配置 + 图形管理面板 +
 - 便携启动：`start-mihomo.vbs` 使用 `-d` 固定家目录到软件目录
 - 示例配置：`config.example.yaml`
 - 内置面板：`ui/zashboard`
-- GitHub Actions：自动跟随官方内核上游（`windows-amd64-v3`）
 
 ---
 
@@ -31,7 +30,6 @@ Windows 便携 Mihomo 懒人包：**内核 + 示例配置 + 图形管理面板 +
 ├── start-mihomo.vbs       # 提权 + 便携目录启动
 ├── config.example.yaml    # 示例配置（复制为 config.yaml）
 ├── ui/zashboard/          # Web 控制面板
-├── .github/workflows/     # 自动同步内核
 └── .gitignore
 ```
 
@@ -49,12 +47,14 @@ Windows 便携 Mihomo 懒人包：**内核 + 示例配置 + 图形管理面板 +
 
 ### 1. 准备内核
 
-下载官方内核（本仓库默认跟随 **windows-amd64-v3**）：
+下载官方内核（本项目按 **windows-amd64-v3** 变体适配说明）：
 
 - 上游发布页：<https://github.com/MetaCubeX/mihomo/releases>
 - 示例包名：`mihomo-windows-amd64-v3-v1.19.29.zip`
 
 解压后把 `mihomo.exe` 放到本目录（与 `MihomoManager.vbs` 同级）。
+
+> 本仓库**不内置、不分发** mihomo 内核，请从官方 Releases 下载。
 
 ### 2. 准备配置
 
@@ -121,24 +121,6 @@ $GistUrl = '你的配置 raw 地址'
 3. 备份旧 `config.yaml`
 4. 写入新配置并回读确认
 5. 优先 API 热重载；失败再提示重启
-
----
-
-## GitHub 自动同步内核（仓库侧）
-
-工作流：`.github/workflows/update-mihomo-core.yml`
-
-- 定时检查 `MetaCubeX/mihomo` 最新 Release
-- 匹配资源：`windows-amd64-v3`
-- 在你自己的仓库创建 Release：`core-vX.Y.Z`，附件为 `mihomo.exe`
-
-使用前请在仓库设置中开启：
-
-**Settings → Actions → General → Workflow permissions → Read and write permissions**
-
-也可在 Actions 页手动 **Run workflow**。
-
-> 这是 GitHub 侧自动跟上游，不是管理面板里的按钮。
 
 ---
 
