@@ -28,7 +28,7 @@ Windows 便携 Mihomo 懒人包：示例配置 + 图形管理面板，内核自�
 ├── MihomoManager.vbs      # 双击打开管理面板
 ├── MihomoManager.ps1      # 管理面板逻辑
 ├── start-mihomo.vbs       # 提权 + 便携目录启动
-├── config.example.yaml    # 示例���置（复制为 config.yaml）
+├── config.example.yaml    # 示例配置（复制为 config.yaml）
 ├── ui/zashboard/          # Web 控制面板
 └── .gitignore
 ```
@@ -127,7 +127,7 @@ $GistUrl = '你的配置 raw 地址'
 ### 核心与生态
 
 - **[MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo)**
-  Mihomo（Clash Meta）内核。本���目的代理能力完全依赖该项目。
+  Mihomo（Clash Meta）内核。本项目的代理能力完全依赖该项目。
 
 - **[hubentuan/mihomo-lazy](https://github.com/hubentuan/mihomo-lazy)**
   本项目参考自该仓库的「便携懒人包」形态与配置组织思路，感谢原作者提供的易用组织方式。
