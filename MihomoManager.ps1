@@ -72,9 +72,15 @@ $StartupDir   = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\St
 $StartupLnk   = Join-Path $StartupDir 'Mihomo.lnk'
 $ProxyRegPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
 
-# 配置在线更新地址；以后要改更新源，只改这里
-$GistUrl = 'https://gist.githubusercontent.com/yg8335266/847e4a81338c85bac1a6783666d3249e/raw/myrule.yaml'
-
+# 配置更新地址：首次点击「更新配置」时弹窗输入，后续使用上次输入（本地文件记忆）
+$UpdateUrlFile = Join-Path $Root 'update_url.txt'
+$GistUrl = ''
+if (Test-Path -LiteralPath $UpdateUrlFile) {
+    try {
+        $saved = (Get-Content -LiteralPath $UpdateUrlFile -Raw -Encoding UTF8).Trim()
+        if ($saved -match '^https?://') { $GistUrl = $saved }
+    } catch {}
+}
 # -------------------- 工具函数 --------------------
 function Write-UiLog {
     param(
@@ -355,6 +361,10 @@ function Show-Info {
     )
 }
 
+function Show-Warn {
+    param([string]$Text, [string]$Title = '注意')
+    [void][System.Windows.Forms.MessageBox]::Show($Text, $Title, [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning)
+}
 function Show-ErrorBox {
     param(
         [string]$Text,
@@ -528,6 +538,44 @@ function Get-FileSha256 {
     param([string]$Path)
     if (-not (Test-Path -LiteralPath $Path)) { return $null }
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+}
+
+function Get-UpdateUrlFromUser {
+    param(
+        [string]$Title = '请输入配置更新地址',
+        [string]$Prompt = '请输入 mihomo 配置的 raw 链接（http/https 开头）：'
+    )
+
+    $default = ''
+    if ($script:GistUrl) { $default = $script:GistUrl }
+    elseif (Test-Path -LiteralPath $UpdateUrlFile) {
+        try {
+            $s = (Get-Content -LiteralPath $UpdateUrlFile -Raw -Encoding UTF8).Trim()
+            if ($s -match '^https?://') { $default = $s }
+        } catch {}
+    }
+
+    Add-Type -AssemblyName Microsoft.VisualBasic -ErrorAction SilentlyContinue
+    $result = [Microsoft.VisualBasic.Interaction]::InputBox($Prompt, $Title, $default)
+    if ([string]::IsNullOrWhiteSpace($result)) { return $null }
+
+    $url = $result.Trim()
+    if ($url -notmatch '^https?://') {
+        Show-Warn '地址必须以 http:// 或 https:// 开头。'
+        return $null
+    }
+    return $url
+}
+
+function Save-UpdateUrl {
+    param([string]$Url)
+    if (-not $Url) { return }
+    try {
+        Set-Content -LiteralPath $UpdateUrlFile -Value $Url -Encoding UTF8 -NoNewline -ErrorAction Stop
+        $script:GistUrl = $Url
+    } catch {
+        Write-UiLog ('无法记忆更新地址: {0}' -f $_.Exception.Message) 'WARN'
+    }
 }
 
 function Get-DownloadUrlWithCacheBust {
@@ -1040,14 +1088,16 @@ $btnAutoOff.Add_Click({
 
 $btnUpdate.Add_Click({
     Invoke-Safe {
-        if ([string]::IsNullOrWhiteSpace($GistUrl)) {
-            Show-Info "尚未设置配置更新地址。`n请编辑 MihomoManager.ps1 顶部的 `$GistUrl。"
+        $url = Get-UpdateUrlFromUser
+        if (-not $url) {
+            Write-UiLog '已取消更新：未输入地址' 'WARN'
             return
         }
-        $msg = "将从在线地址下载并覆盖本地 config.yaml。`n会先自动备份当前配置，并做本地校验。`n是否继续？`n`n地址：`n$GistUrl"
+        Save-UpdateUrl -Url $url
+
+        $msg = "将从在线地址下载并覆盖本地 config.yaml。`n会先自动备份当前配置，并做本地校验。`n是否继续？`n`n地址：`n$url"
         if (-not (Confirm-Action $msg)) { return }
         Update-ConfigFromGist
-        # Update-ConfigFromGist 内部已有结果提示，这里不再重复弹窗
     }
 })
 
