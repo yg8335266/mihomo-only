@@ -1,0 +1,279 @@
+# ============================================================
+# Mihomo 示例配置（请复制为 config.yaml 后再修改）
+# 复制命令：copy config.example.yaml config.yaml
+#
+# 使用前请修改：
+# 1) mixed-port / external-controller / secret
+# 2) proxy-providers 里的订阅 URL
+# 3) 按需增删规则与分组
+# ============================================================
+
+# 混合代理端口（HTTP + SOCKS）
+mixed-port: 7897
+allow-lan: false
+bind-address: "*"
+mode: rule
+log-level: info
+ipv6: true
+
+# 进程匹配（规则里用到 PROCESS-NAME 再开；不用可改 off）
+find-process-mode: strict
+
+# 控制面板 / API（改端口后请重启 Mihomo）
+external-controller: 127.0.0.1:9090
+# 面板登录密钥：请改成你自己的强密码
+secret: "change-me-to-a-strong-password"
+external-ui: ui/zashboard
+external-ui-name: zashboard
+
+# TCP 优化（可按需保留）
+tcp-concurrent: true
+keep-alive-interval: 15
+keep-alive-idle: 15
+
+profile:
+  store-selected: true
+  store-fake-ip: true
+
+# ---------------- DNS ----------------
+dns:
+  enable: true
+  prefer-h3: true
+  use-hosts: true
+  use-system-hosts: true
+  listen: 0.0.0.0:1053
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-filter:
+    - "*"
+    - "+.lan"
+    - "+.local"
+    - "time.*.com"
+    - "ntp.*.com"
+  default-nameserver:
+    - 119.29.29.29
+    - 223.5.5.5
+  nameserver:
+    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+  fallback:
+    - https://dns.google/dns-query
+    - https://cloudflare-dns.com/dns-query
+  fallback-filter:
+    geoip: true
+    geoip-code: CN
+    ipcidr:
+      - 240.0.0.0/4
+
+# ---------------- TUN（可选，需要管理员权限） ----------------
+tun:
+  enable: true
+  stack: mixed
+  auto-route: true
+  auto-detect-interface: true
+  dns-hijack:
+    - any:53
+
+# ============================================================
+# 订阅节点（请换成你自己的订阅链接）
+# path 会自动缓存到本地 proxy_provider 目录
+# ============================================================
+proxy-providers:
+  p1:
+    type: http
+    url: "https://example.com/your-subscription-1"
+    path: ./proxy_provider/p1.yaml
+    interval: 86400
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 600
+    override:
+      additional-prefix: "[P1]"
+
+  p2:
+    type: http
+    url: "https://example.com/your-subscription-2"
+    path: ./proxy_provider/p2.yaml
+    interval: 86400
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 600
+    override:
+      additional-prefix: "[P2]"
+
+# ============================================================
+# 代理分组（示例：选择 / 自动 / 直连 / 拒绝）
+# ============================================================
+proxy-groups:
+  - name: 节点选择
+    type: select
+    proxies:
+      - 自动选择
+      - 直连
+    use:
+      - p1
+      - p2
+
+  - name: 自动选择
+    type: url-test
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+    use:
+      - p1
+      - p2
+
+  - name: 直连
+    type: select
+    proxies:
+      - DIRECT
+
+  - name: 拒绝
+    type: select
+    proxies:
+      - REJECT
+
+  # 常用分流出口（可按需改成指向“节点选择”）
+  - name: AI
+    type: select
+    proxies:
+      - 节点选择
+      - 自动选择
+      - 直连
+
+  - name: YouTube
+    type: select
+    proxies:
+      - 节点选择
+      - 自动选择
+      - 直连
+
+  - name: Google
+    type: select
+    proxies:
+      - 节点选择
+      - 自动选择
+      - 直连
+
+  - name: GitHub
+    type: select
+    proxies:
+      - 节点选择
+      - 自动选择
+      - 直连
+
+  - name: Telegram
+    type: select
+    proxies:
+      - 节点选择
+      - 自动选择
+      - 直连
+
+  - name: 国内
+    type: select
+    proxies:
+      - 直连
+      - 节点选择
+
+# ============================================================
+# 规则集（在线拉取，会缓存到 ./rules ）
+# 若你希望更少依赖外网，可自行改为 type: file
+# ============================================================
+rule-providers:
+  reject:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/reject.txt"
+    path: ./rules/reject.yaml
+    interval: 86400
+
+  private:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/private.txt"
+    path: ./rules/private.yaml
+    interval: 86400
+
+  apple:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/apple.txt"
+    path: ./rules/apple.yaml
+    interval: 86400
+
+  icloud:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/icloud.txt"
+    path: ./rules/icloud.yaml
+    interval: 86400
+
+  google:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/google.txt"
+    path: ./rules/google.yaml
+    interval: 86400
+
+  proxy:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/proxy.txt"
+    path: ./rules/proxy.yaml
+    interval: 86400
+
+  direct:
+    type: http
+    behavior: domain
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/direct.txt"
+    path: ./rules/direct.yaml
+    interval: 86400
+
+  telegramcidr:
+    type: http
+    behavior: ipcidr
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/telegramcidr.txt"
+    path: ./rules/telegramcidr.yaml
+    interval: 86400
+
+  cncidr:
+    type: http
+    behavior: ipcidr
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/cncidr.txt"
+    path: ./rules/cncidr.yaml
+    interval: 86400
+
+  lancidr:
+    type: http
+    behavior: ipcidr
+    url: "https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/lancidr.txt"
+    path: ./rules/lancidr.yaml
+    interval: 86400
+
+# ============================================================
+# 规则（从上到下匹配，越具体越靠前）
+# ============================================================
+rules:
+  - RULE-SET,reject,拒绝
+  - RULE-SET,private,直连
+  - RULE-SET,lancidr,直连
+  - RULE-SET,icloud,直连
+  - RULE-SET,apple,直连
+  - RULE-SET,telegramcidr,Telegram
+  - RULE-SET,google,Google
+  - DOMAIN-SUFFIX,googleapis.cn,Google
+  - DOMAIN-SUFFIX,youtube.com,YouTube
+  - DOMAIN-SUFFIX,googlevideo.com,YouTube
+  - DOMAIN-SUFFIX,youtu.be,YouTube
+  - DOMAIN-SUFFIX,github.com,GitHub
+  - DOMAIN-SUFFIX,github.io,GitHub
+  - DOMAIN-SUFFIX,openai.com,AI
+  - DOMAIN-SUFFIX,chatgpt.com,AI
+  - DOMAIN-SUFFIX,anthropic.com,AI
+  - RULE-SET,proxy,节点选择
+  - RULE-SET,direct,直连
+  - RULE-SET,cncidr,国内
+  - GEOIP,CN,国内
+  - MATCH,节点选择

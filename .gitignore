@@ -1,0 +1,35 @@
+# -------- 本地私密 / 运行时文件（不要提交） --------
+config.yaml
+*.bak
+*.tmp
+cache.db
+*.log
+
+# 订阅与规则缓存（运行后自动生成）
+proxy_provider/
+rules/
+
+# 内核与备份（体积大；可用管理面板“更新内核”获取）
+mihomo.exe
+meta-backup/
+*.exe
+
+# 地理数据（运行后自动下载）
+GeoIP.dat
+GeoSite.dat
+geoip.metadb
+geosite.dat
+ASN.mmdb
+country.mmdb
+*.mmdb
+
+# 系统 / 工具残留
+.DS_Store
+Thumbs.db
+desktop.ini
+.aionrs/
+_opt_scan.txt
+_analysis_*.txt
+
+# 可选：若不想把面板源文件推进仓库，取消下一行注释
+# ui/
